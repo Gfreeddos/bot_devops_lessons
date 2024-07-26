@@ -1,0 +1,104 @@
+version: "3.9"
+services:
+  bot_app:
+    build:
+      context: ./bot_app
+      args:
+        - RM_HOST=$RM_HOST
+        - RM_PORT=$RM_PORT
+        - RM_USER=$RM_USER
+        - RM_PASSWORD=$RM_PASSWORD
+        - TOKEN=$TOKEN
+        - DB_USER=$DB_USER
+        - DB_PASSWORD=$DB_PASSWORD
+        - DB_HOST=$DB_HOST
+        - DB_PORT=$DB_PORT
+        - DB_DATABASE=$DB_DATABASE
+    container_name: bot_app
+    image: bot_app:latest
+    restart: always
+    networks:
+      - my_network
+
+  postgresql_master:
+    build:
+      context: ./data_master
+      args:
+        - DB_USER=$DB_USER
+        - DB_PASSWORD=$DB_PASSWORD
+        - DB_HOST=$DB_HOST
+        - DB_PORT=$DB_PORT
+        - DB_DATABASE=$DB_DATABASE
+        - DB_REPL_USER=$DB_REPL_USER
+        - DB_REPL_PASSWORD=$DB_REPL_PASSWORD
+    container_name: ${DB_HOST}
+    image: db_image:latest
+    healthcheck:
+      test: ["CMD-SHELL", "sh -c 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} -p ${DB_PORT}'"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    volumes:
+      - ./data_master/data:/var/lib/postgresql/data
+    networks:
+      - my_network
+
+  postgresql_slave:
+    build:
+      context: ./data_slave
+      args:
+        - DB_REPL_USER=$DB_REPL_USER
+        - DB_REPL_PASSWORD=$DB_REPL_PASSWORD
+        - DB_REPL_HOST=$DB_REPL_HOST
+        - DB_REPL_PORT=$DB_REPL_PORT
+        - DB_HOST=$DB_HOST
+        - DB_PORT=$DB_PORT
+    container_name: ${DB_REPL_HOST}
+    image: db_repl_image
+    depends_on:
+      postgresql_master:
+        condition: service_healthy
+        restart: true
+    volumes:
+      - ./data_slave/data:/var/lib/postgresql/data
+    networks:
+      - my_network
+
+  pgadmin:
+    build:
+      context: ./pgadmin
+      args:
+        - DB_USER=$DB_USER
+        - DB_HOST=$DB_HOST
+        - DB_PORT=$DB_PORT
+        - DB_DATABASE=$DB_DATABASE
+        - DB_REPL_USER=$DB_REPL_USER
+        - DB_REPL_HOST=$DB_REPL_HOST
+        - DB_REPL_PORT=$DB_REPL_PORT
+    container_name: pgadmin
+    image: pgadmin_image
+    environment:
+      PGADMIN_DEFAULT_EMAIL: "user@example.com"
+      PGADMIN_DEFAULT_PASSWORD: "user"
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    volumes:
+      - ./pgadmin/data:/var/lib/pgadmin
+    ports:
+      - "5050:80"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+    networks:
+      - my_network
+
+networks:
+  my_network:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.18.0.0/16
+          ip_range: 172.18.5.0/24
+          gateway: 172.18.5.254
