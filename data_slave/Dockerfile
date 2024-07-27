@@ -19,4 +19,6 @@ ENV PGDATA="/var/lib/postgresql/data/pgdata"
 
 COPY ./entrypoint.sh /
 
+RUN ["chmod", "+x", "/entrypoint.sh"]
+
 ENTRYPOINT ["/entrypoint.sh"]
