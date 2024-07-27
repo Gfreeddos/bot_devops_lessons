@@ -1,0 +1,48 @@
+- name: TG_bot
+  hosts: all
+  become: yes
+  vars:
+    compose_dir: /tmp/ansible-examples
+  tasks:
+     - name: get docker version
+       shell: "docker -v | cut -d ' ' -f 3 | cut -d ',' -f 1"
+       register: docker_version
+
+     - name: get docker version
+       shell: "docker compose version | cut -d ' ' -f 4 | cut -d ',' -f 1"
+       register: docker_compose_version
+
+     - name: Deploy TG bot
+       block:
+
+         - name: Clone docker brunch
+           ansible.builtin.git:
+             repo: https://github.com/Gfreeddos/bot_devops_lessons.git
+             dest: "{{compose_dir}}"
+             single_branch: yes
+             version: docker
+
+         - name: Copy file example_file to /tmp with permissions
+           ansible.builtin.copy:
+             src: ./.env
+             dest: "{{compose_dir}}"
+             mode: '0644'
+
+         - name: Install collection community.docker
+           community.general.ansible_galaxy_install:
+             type: collection
+             name: community.docker
+
+         - name: Run docker-compose up
+           community.docker.docker_compose_v2:
+             project_src: "{{compose_dir}}"
+             build: always
+           register: output
+
+         - name: Show results
+           ansible.builtin.debug:
+             var: output
+
+       when:
+         - not docker_version.failed
+         - not docker_compose_version.failed

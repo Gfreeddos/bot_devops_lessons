@@ -1,0 +1,1 @@
+host01 ansible_host=192.168.101.102 ansible_user=administrator ansible_password=P@ssw0rd
